@@ -116,30 +116,16 @@ ls -1 global-claude-md/
 - [ ] `global-claude-md/settings.json` has `PreToolUse` hook → `~/.claude/hooks/block-secrets.py`
 - [ ] `global-claude-md/settings.json` has `Stop` hooks → `verify-no-secrets.sh` and `check-rulecatch.sh`
 
-### 1.7 Database Wrapper
+### 1.7 StrictDB (npm package)
+
+StrictDB is used directly as an npm dependency. There is no `src/core/db/` directory.
 
 ```bash
-wc -l src/core/db/index.ts
+ls src/core/db/ 2>/dev/null && echo "FAIL: src/core/db/ should not exist" || echo "PASS: no src/core/db/ directory"
 ```
 
-- [ ] `src/core/db/index.ts` exists (thin StrictDB adapter)
-- [ ] File size < 300 lines (currently ~270)
-- [ ] Exports: `connect`, `closePool`, `raw`
-- [ ] Exports: `queryOne`, `queryMany`, `queryWithLookup`, `count`
-- [ ] Exports: `insertOne`, `insertMany`, `updateOne`, `updateMany`, `deleteOne`, `deleteMany`, `batch`
-- [ ] Exports: `describe`, `validate`, `explain`
-- [ ] Exports: `registerCollection`, `ensureIndexes`
-- [ ] Exports: `gracefulShutdown`
-- [ ] Uses StrictDB singleton via `globalThis` symbol
-- [ ] `src/core/db/sql.ts` does NOT exist (replaced by StrictDB)
-
-Verify exports exist:
-
-```bash
-grep -c "^export " src/core/db/index.ts
-```
-
-Expected: >= 16 exported functions/types.
+- [ ] `src/core/db/` directory does NOT exist (StrictDB is imported directly from the npm package)
+- [ ] `strictdb` is listed in `package.json` dependencies (for database-enabled projects)
 
 ### 1.8 Scripts Directory
 
@@ -588,9 +574,9 @@ cat tests/e2e/example-homepage.spec.ts
 
 ---
 
-## Section 9: Database Wrapper Compiles
+## Section 9: StrictDB Dependency
 
-> Verify the db wrapper has no TypeScript errors.
+> Verify StrictDB is properly configured as an npm dependency.
 
 ```bash
 cd /home/tim_carter81/projects/claude-code-mastery-project-starter-kit && pnpm install 2>&1 | tail -5
@@ -603,7 +589,7 @@ pnpm typecheck 2>&1
 ```
 
 - [ ] TypeScript compiles with zero errors
-- [ ] `src/core/db/index.ts` passes type checking
+- [ ] StrictDB imports resolve correctly (no missing module errors)
 
 ---
 
@@ -684,7 +670,7 @@ wc -l CLAUDE.md
 - [ ] Rule 0: NEVER Publish Sensitive Data
 - [ ] Rule 1: TypeScript Always
 - [ ] Rule 2: API Versioning (`/api/v1/`)
-- [ ] Rule 3: Database Access — Wrapper Only
+- [ ] Rule 3: Database Access — StrictDB
 - [ ] Rule 4: Testing — Explicit Success Criteria
 - [ ] Rule 5: NEVER Hardcode Credentials
 - [ ] Rule 6: ALWAYS Ask Before Deploying
@@ -762,7 +748,7 @@ ls -R ~/projects/TESTPROJECT/scripts/ 2>/dev/null
 ```
 
 - [ ] `src/` directory exists
-- [ ] `src/core/db/index.ts` exists (StrictDB adapter — default profile has `database = mongo`)
+- [ ] `strictdb` in `package.json` dependencies (default profile has `database = mongo`)
 - [ ] `tests/unit/` exists
 - [ ] `tests/integration/` exists
 - [ ] `tests/e2e/` exists
@@ -811,7 +797,7 @@ Since `default` profile was used:
 
 - [ ] Framework is Next.js (check package.json for `next`)
 - [ ] Package manager is pnpm (check for `pnpm-lock.yaml`)
-- [ ] Database is MongoDB (check for `src/core/db/index.ts`)
+- [ ] Database is MongoDB (check for `strictdb` in package.json dependencies)
 - [ ] Has SEO setup (check for meta tags in layout)
 - [ ] Has Tailwind CSS (check for `tailwindcss` in dependencies)
 - [ ] Has Docker setup (check for `Dockerfile`)
@@ -842,7 +828,7 @@ head -50 ~/projects/TESTPROJECT/CLAUDE.md
 - [ ] Has tech stack section mentioning Next.js, MongoDB, etc.
 - [ ] Has port assignments
 - [ ] Has build/test/dev commands
-- [ ] Has database rules (wrapper-only access)
+- [ ] Has database rules (StrictDB-only access)
 
 ### 13.11 Verify Error Handlers
 
@@ -915,7 +901,7 @@ cat ~/projects/TESTPROJECT-CLEAN/CLAUDE.md
 - [ ] Does NOT have API versioning rules
 - [ ] Does NOT have port assignments
 - [ ] Does NOT have quality gate numbers (300 lines, 50 lines)
-- [ ] Does NOT have database wrapper rules
+- [ ] Does NOT have database StrictDB rules
 
 ---
 
@@ -1011,31 +997,28 @@ ls ~/projects/TESTPROJECT-GO/node_modules/ 2>/dev/null
 
 ---
 
-## Section 16: SQL Database Wrapper
+## Section 16: StrictDB Direct Usage
 
-> Verify that `sql.ts` no longer exists (replaced by StrictDB unified wrapper in `index.ts`).
+> Verify that StrictDB is used directly as an npm package (no local wrapper file).
 
-### 16.1 sql.ts Removed
-
-```bash
-ls src/core/db/sql.ts 2>/dev/null && echo "FAIL: sql.ts still exists" || echo "PASS: sql.ts removed"
-```
-
-- [ ] `src/core/db/sql.ts` does NOT exist
-- [ ] `src/core/db/index.ts` handles all backends via StrictDB
-
-### 16.2 StrictDB Adapter Exports
+### 16.1 No Local Wrapper
 
 ```bash
-grep -c "^export " src/core/db/index.ts
+ls src/core/db/ 2>/dev/null && echo "FAIL: src/core/db/ should not exist" || echo "PASS: no local wrapper"
 ```
 
-- [ ] Exports: `connect`, `closePool`, `gracefulShutdown`, `raw`
-- [ ] Exports: `queryOne`, `queryMany`, `queryWithLookup`, `count`
-- [ ] Exports: `insertOne`, `insertMany`, `updateOne`, `updateMany`, `deleteOne`, `deleteMany`, `batch`
-- [ ] Exports: `describe`, `validate`, `explain`
-- [ ] Exports: `registerCollection`, `ensureIndexes`
-- [ ] Expected: >= 16 exported functions/types
+- [ ] `src/core/db/` directory does NOT exist
+- [ ] StrictDB is imported directly from the `strictdb` npm package
+
+### 16.2 StrictDB API Available
+
+StrictDB provides these functions when imported directly:
+
+- [ ] `connect`, `closePool`, `gracefulShutdown`, `raw`
+- [ ] `queryOne`, `queryMany`, `queryWithLookup`, `count`
+- [ ] `insertOne`, `insertMany`, `updateOne`, `updateMany`, `deleteOne`, `deleteMany`, `batch`
+- [ ] `describe`, `validate`, `explain`
+- [ ] `registerCollection`, `ensureIndexes`
 
 ### 16.3 Backend Auto-Detection (via StrictDB)
 
@@ -1470,14 +1453,14 @@ rm -rf /tmp/test-convert
 | 6. Security | | | | |
 | 7. Project Conf | | | | |
 | 8. E2E Template | | | | |
-| 9. DB Wrapper Compiles | | | | |
+| 9. StrictDB Dependency | | | | |
 | 10. Content System | | | | |
 | 11. DB Query System | | | | |
 | 12. CLAUDE.md Completeness | | | | |
 | 13. /new-project default | | | | |
 | 14. /new-project clean | | | | |
 | 15. /new-project go | | | | |
-| 16. SQL Wrapper | | | | |
+| 16. StrictDB Direct Usage | | | | |
 | 17. /new-project python | | | | |
 | 18. New Commands | | | | |
 | 19. Convert Command | | | | |

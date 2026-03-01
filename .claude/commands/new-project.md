@@ -211,7 +211,7 @@ project/
 - No `package.json` — user picks their own language, runtime, and package manager
 - No `tsconfig.json` — user may not even use TypeScript
 - No `vitest.config.ts` or `playwright.config.ts` — user picks their own test tools
-- No database wrapper or `scripts/db-query.ts` — user picks their own database
+- No database setup or `scripts/db-query.ts` — user picks their own database
 - No content builder — user decides if they need one
 - No SEO templates — user decides their own approach
 - No port assignments — user decides their own ports
@@ -881,7 +881,7 @@ project/
 │       ├── main.py              # Entry point (FastAPI/Flask app)
 │       ├── config.py            # Pydantic BaseSettings for env vars
 │       ├── core/
-│       │   └── db.py            # Database wrapper
+│       │   └── db.py            # Database connection layer
 │       ├── api/
 │       │   └── v1/
 │       │       ├── __init__.py
@@ -1364,7 +1364,7 @@ The script handles ALL of the following in one execution with progress indicator
 - Creates all directories (src/, .claude/, project-docs/, tests/, scripts/, .github/)
 - Copies 16 project-scoped commands, 2 skills, 2 agents, all 9 hooks
 - Writes settings.json (full 9-hook config)
-- Copies StrictDB wrapper (src/core/db/index.ts) + query system
+- Installs StrictDB (npm package) + query system
 - Creates Next.js app structure (layout, page, API health route, instrumentation)
 - Creates TypeScript, Next.js, Tailwind, PostCSS, Vitest, Playwright configs
 - Creates package.json with all deps/scripts
@@ -1427,21 +1427,20 @@ project/
 
 When the project uses a SQL database (PostgreSQL, MySQL, MSSQL, or SQLite), StrictDB handles the connection via `STRICTDB_URI`:
 
-1. Copy `src/core/db/index.ts` (StrictDB wrapper) from the starter kit into the new project
-2. Install StrictDB and the appropriate driver based on database choice:
+1. Install StrictDB and the appropriate driver based on database choice:
    - All databases: `npm install strictdb@^0.1.0`
    - PostgreSQL: `npm install pg @types/pg`
    - MySQL: `npm install mysql2`
    - MSSQL: `npm install mssql`
    - SQLite: `npm install better-sqlite3 @types/better-sqlite3`
-3. Set `STRICTDB_URI` in `.env.example` with placeholder
-4. Add StrictDB wrapper rules to the project's CLAUDE.md
+2. Set `STRICTDB_URI` in `.env.example` with placeholder
+3. Add StrictDB rules to the project's CLAUDE.md
 
 **The rule that MUST be in every SQL project's CLAUDE.md:**
 
-> ALL SQL database access goes through `src/core/db/index.ts` (StrictDB wrapper). No exceptions.
-> NEVER create connection pools anywhere else.
-> NEVER import database drivers directly outside the wrapper.
+> ALL SQL database access goes through StrictDB. No exceptions.
+> NEVER create connection pools manually — StrictDB manages connections.
+> NEVER import database drivers directly — use StrictDB's API.
 > ALWAYS use parameterized queries — NEVER string-interpolate values into SQL.
 
 **STRICTDB_URI examples for .env.example:**
@@ -1566,8 +1565,8 @@ export default defineConfig({
 Add to EVERY Node.js entry point. If the project uses StrictDB, use `gracefulShutdown` to close pools before exit:
 
 ```typescript
-// WITH StrictDB (projects using src/core/db/)
-import { gracefulShutdown } from '@/core/db/index.js';
+// WITH StrictDB (projects using StrictDB)
+import { gracefulShutdown } from 'strictdb';
 
 process.on('SIGTERM', () => gracefulShutdown(0));
 process.on('SIGINT', () => gracefulShutdown(0));
@@ -2179,8 +2178,8 @@ When scaffolding the starter kit itself, create `claude-mastery-project.conf` wi
 
 | Scaffolding Choice | Feature Name | Files to List |
 |-------------------|-------------|---------------|
-| `database = mongo` | `mongo` | `src/core/db/index.ts`, `scripts/db-query.ts`, `scripts/queries/example-find-user.ts`, `scripts/queries/example-count-docs.ts` |
-| `database = postgres\|mysql\|mssql\|sqlite` | `postgres` | `src/core/db/index.ts` |
+| `database = mongo` | `mongo` | `scripts/db-query.ts`, `scripts/queries/example-find-user.ts`, `scripts/queries/example-count-docs.ts` |
+| `database = postgres\|mysql\|mssql\|sqlite` | `postgres` | `scripts/db-query.ts` |
 | Vitest installed | `vitest` | `vitest.config.ts` |
 | Playwright installed | `playwright` | `playwright.config.ts` |
 | Docker selected | `docker` | `Dockerfile` |
@@ -2246,7 +2245,7 @@ After creation, verify and report:
 - [ ] Multi-region deploy script (if multiregion selected)
 
 **Database (StrictDB projects):**
-- [ ] src/core/db/index.ts — StrictDB wrapper
+- [ ] StrictDB installed as dependency
 - [ ] scripts/db-query.ts — Test Query Master
 - [ ] scripts/queries/ directory
 - [ ] db-query rules in CLAUDE.md

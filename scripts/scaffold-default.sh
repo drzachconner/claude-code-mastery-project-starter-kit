@@ -79,7 +79,6 @@ echo ""
 progress "Creating directory structure..."
 mkdir -p "$PROJECT_PATH"/.claude/{commands,skills,agents,hooks}
 mkdir -p "$PROJECT_PATH"/project-docs
-mkdir -p "$PROJECT_PATH"/src/core/db
 mkdir -p "$PROJECT_PATH"/src/app/api/v1/health
 mkdir -p "$PROJECT_PATH"/src/handlers
 mkdir -p "$PROJECT_PATH"/src/adapters
@@ -195,7 +194,6 @@ cat > "$PROJECT_PATH/.claude/features.json" << FEATURES_EOF
       "installedAt": "${CREATED_AT}",
       "updatedAt": null,
       "files": [
-        "src/core/db/index.ts",
         "scripts/db-query.ts",
         "scripts/queries/example-find-user.ts",
         "scripts/queries/example-count-docs.ts"
@@ -229,9 +227,8 @@ cat > "$PROJECT_PATH/.claude/features.json" << FEATURES_EOF
 }
 FEATURES_EOF
 
-# ── Step 5: Copy StrictDB wrapper + query system ──────────────────────────────
-progress "Copying StrictDB wrapper + query system..."
-cp "$STARTER_KIT/src/core/db/index.ts" "$PROJECT_PATH/src/core/db/index.ts"
+# ── Step 5: Copy query system ─────────────────────────────────────────────────
+progress "Copying StrictDB query system..."
 cp "$STARTER_KIT/scripts/db-query.ts" "$PROJECT_PATH/scripts/db-query.ts"
 cp "$STARTER_KIT/scripts/queries/example-find-user.ts" "$PROJECT_PATH/scripts/queries/"
 cp "$STARTER_KIT/scripts/queries/example-count-docs.ts" "$PROJECT_PATH/scripts/queries/"
@@ -320,17 +317,20 @@ HEALTH_EOF
 cat > "$PROJECT_PATH/src/instrumentation.ts" << 'INSTRUMENT_EOF'
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    const { gracefulShutdown } = await import('@/core/db/index.js');
+    const { StrictDB } = await import('strictdb');
 
-    process.on('SIGTERM', () => gracefulShutdown(0));
-    process.on('SIGINT', () => gracefulShutdown(0));
+    // Get or create the shared StrictDB instance
+    const db = await StrictDB.create({ uri: process.env.STRICTDB_URI! });
+
+    process.on('SIGTERM', () => db.gracefulShutdown(0));
+    process.on('SIGINT', () => db.gracefulShutdown(0));
     process.on('uncaughtException', (err) => {
       console.error('Uncaught Exception:', err);
-      gracefulShutdown(1);
+      db.gracefulShutdown(1);
     });
     process.on('unhandledRejection', (reason) => {
       console.error('Unhandled Rejection:', reason);
-      gracefulShutdown(1);
+      db.gracefulShutdown(1);
     });
   }
 }
@@ -721,13 +721,13 @@ WRONG:   /api/users
 
 Every API endpoint MUST use `/api/v1/` prefix. No exceptions.
 
-### 3. Database Access — StrictDB Wrapper Only (`src/core/db/index.ts`)
+### 3. Database Access — StrictDB
 
-**ALL database access goes through `src/core/db/index.ts`. No exceptions.**
+**ALL database access uses StrictDB directly. No exceptions.**
 
-- NEVER create database clients anywhere else
-- NEVER import database drivers directly except in `src/core/db/index.ts`
-- ALWAYS import from `src/core/db/` for all database operations
+- Install `strictdb` + your driver, use `StrictDB.create()` at app startup
+- NEVER import native database drivers (`mongodb`, `pg`, etc.) directly
+- Share a single StrictDB instance across the application
 - All query inputs are automatically sanitized against injection
 
 **Test queries go through `scripts/db-query.ts`:**

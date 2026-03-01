@@ -19,8 +19,8 @@ The authoritative table of features that can be added to projects. Both `/add-fe
 
 | Feature | Files (from $SOURCE) | Deps | DevDeps | Env Vars | Scripts | CLAUDE.md Rule |
 |---------|---------------------|------|---------|----------|---------|----------------|
-| `mongo` | `src/core/db/index.ts`, `scripts/db-query.ts`, `scripts/queries/example-find-user.ts`, `scripts/queries/example-count-docs.ts` | `strictdb@^0.1.0`, `mongodb@^6.5.0` | `tsx@^4.7.0` | `STRICTDB_URI` | `db:query`, `db:query:list` | Rule 3 |
-| `postgres` | `src/core/db/index.ts` | `strictdb@^0.1.0`, `pg@^8.0.0` | — | `STRICTDB_URI` | — | Rule 3 |
+| `mongo` | `scripts/db-query.ts`, `scripts/queries/example-find-user.ts`, `scripts/queries/example-count-docs.ts` | `strictdb@^0.1.0`, `mongodb@^6.5.0` | `tsx@^4.7.0` | `STRICTDB_URI` | `db:query`, `db:query:list` | Rule 3 |
+| `postgres` | `scripts/db-query.ts`, `scripts/queries/example-find-user.ts`, `scripts/queries/example-count-docs.ts` | `strictdb@^0.1.0`, `pg@^8.0.0` | `tsx@^4.7.0` | `STRICTDB_URI` | `db:query`, `db:query:list` | Rule 3 |
 | `docker` | Generated from templates (Dockerfile, docker-compose.yml) | — | — | — | — | Rule 10 |
 | `vitest` | `vitest.config.ts` | — | `vitest@^2.0.0` | — | `test:unit`, `test:unit:watch`, `test:coverage` | — |
 | `playwright` | `playwright.config.ts` | — | `@playwright/test@^1.42.0` | — | `test:e2e`, `test:e2e:ui`, `test:e2e:headed`, `test:e2e:chromium`, `test:e2e:report`, `test:kill-ports` | Rule 4 |
@@ -52,8 +52,8 @@ Parse `$ARGUMENTS` for:
 
 If no feature names and no `--list`: ask via AskUserQuestion:
 "Which feature do you want to add?"
-- **mongo** — StrictDB wrapper, query system, connection pool management
-- **postgres** — StrictDB wrapper with parameterized queries, transaction support
+- **mongo** — StrictDB database driver, query system, connection management
+- **postgres** — StrictDB database driver with parameterized queries, transaction support
 - **vitest** — Unit/integration test framework with coverage
 - **playwright** — E2E browser testing with multi-browser support
 
@@ -148,7 +148,6 @@ For each feature to install/update, display:
 === Feature Preview: <name> ===
 
 Files to copy:
-  + src/core/db/index.ts
   + scripts/db-query.ts
   + scripts/queries/example-find-user.ts
   + scripts/queries/example-count-docs.ts
@@ -166,7 +165,7 @@ Scripts to add (package.json):
   db:query:list → tsx scripts/db-query.ts --list
 
 CLAUDE.md sections:
-  Rule 3: Database Access — Wrapper Only (if missing)
+  Rule 3: Database Access — StrictDB (if missing)
 ```
 
 Ask via AskUserQuestion:
@@ -250,10 +249,10 @@ For each script in the feature definition:
 
 Check if the relevant CLAUDE.md rule section exists by searching for the header text. If missing, append it.
 
-**mongo → Rule 3 header check:** Search for `Database Access` or `Wrapper Only` in `$TARGET/CLAUDE.md`
+**mongo → Rule 3 header check:** Search for `Database Access` or `StrictDB` in `$TARGET/CLAUDE.md`
 If missing, append the full Rule 3 section from the starter kit's CLAUDE.md.
 
-**postgres → Rule 3 header check:** Search for `Database Access` or `Wrapper Only` in `$TARGET/CLAUDE.md`
+**postgres → Rule 3 header check:** Search for `Database Access` or `StrictDB` in `$TARGET/CLAUDE.md`
 If missing, append the full Rule 3 section from the starter kit's CLAUDE.md.
 
 **playwright → Rule 4 header check:** Search for `Testing — Explicit Success Criteria` in `$TARGET/CLAUDE.md`
@@ -345,6 +344,6 @@ Manifest updated: .claude/features.json
 
 3. **Multiple features at once** — Process each feature sequentially. One commit at the end with all features listed.
 
-4. **Go/Python projects requesting mongo** — Copy the Node.js wrapper files but skip npm dependency installation. Note in summary: "Files copied but dependencies not installed (not a Node.js project). Install StrictDB and the MongoDB driver for your language manually."
+4. **Go/Python projects requesting mongo** — Copy the query system files but skip npm dependency installation. Note in summary: "Files copied but dependencies not installed (not a Node.js project). Install StrictDB and the MongoDB driver for your language manually."
 
 5. **Source file missing** — If a file listed in the feature definition doesn't exist in `$SOURCE`, warn and skip that file. Don't fail the entire operation.

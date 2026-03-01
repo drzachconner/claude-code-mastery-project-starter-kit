@@ -92,7 +92,7 @@ project/
 - No linter warnings
 
 ### Database
-- ALWAYS use a centralized database wrapper (singleton pattern)
+- ALWAYS use StrictDB for all database access (shared instance pattern)
 - NEVER create database connections in individual files
 
 ### Async Performance

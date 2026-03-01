@@ -91,9 +91,9 @@ Run through EVERY check below. For each violation found, note the line number, w
 
 ### 1F. Database Access (Rule 3)
 
-- No direct `StrictDB`, `MongoClient`, or database driver imports outside `src/core/db/`
-- All queries go through the wrapper (`queryOne`, `queryMany`, `insertOne`, etc.)
-- No `find()` or `findOne()` — use aggregation via the wrapper
+- No direct `MongoClient`, `pg`, `mysql2`, or other database driver imports — use StrictDB
+- All queries go through StrictDB (`queryOne`, `queryMany`, `insertOne`, etc.)
+- No `find()` or `findOne()` — use StrictDB's query API
 - Counters use `$inc` not read-modify-write
 
 ### 1G. API Routes (Rule 2)
@@ -147,7 +147,7 @@ TypeScript fixes:
 Other fixes:
   - Lines 23-25: sequential awaits → Promise.all (independent)
   - Line 67: swallowed error → proper logging + rethrow
-  - Line 112: direct database driver import → use wrapper
+  - Line 112: direct database driver import → use StrictDB
   - Lines 200-215: dead code (commented out old auth) → remove
 
 Blast radius: imported by 3 files (server.ts, user-routes.ts, admin.ts)

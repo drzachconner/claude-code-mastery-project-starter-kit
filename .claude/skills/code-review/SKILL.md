@@ -54,7 +54,7 @@ When reviewing code, follow this systematic approach:
 
 ## 6. Architecture
 
-- [ ] Database access through centralized wrapper only
+- [ ] Database access through StrictDB only
 - [ ] API versioning (/api/v1/) followed
 - [ ] Service separation respected
 - [ ] No business logic in route handlers

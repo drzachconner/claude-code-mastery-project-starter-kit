@@ -62,7 +62,7 @@
       <a href="#daily-workflow">Part 2: Daily Workflow</a>
       <a href="#commands-deep-dive">Part 3: Commands Deep Dive</a>
       <a href="#hook-system">Part 4: Hook System</a>
-      <a href="#database-wrapper">Part 5: Database Wrapper</a>
+      <a href="#strictdb-database-layer">Part 5: StrictDB Database Layer</a>
       <a href="#claudemd-customization">Part 6: CLAUDE.md Customization</a>
       <a href="#testing">Part 7: Testing</a>
       <a href="#deployment">Part 8: Deployment</a>
@@ -106,7 +106,7 @@
         <a href="#daily-workflow">Part 2: Daily Workflow</a>
         <a href="#commands-deep-dive">Part 3: Commands Deep Dive</a>
         <a href="#hook-system">Part 4: Hook System</a>
-        <a href="#database-wrapper">Part 5: Database Wrapper</a>
+        <a href="#strictdb-database-layer">Part 5: StrictDB Database Layer</a>
         <a href="#claudemd-customization">Part 6: CLAUDE.md Customization</a>
         <a href="#testing">Part 7: Testing</a>
         <a href="#deployment">Part 8: Deployment</a>
@@ -331,7 +331,7 @@
           </div>
           <div class="command-card">
             <h3><code>/create-api &lt;resource&gt;</code></h3>
-            <p class="command-desc">Scaffold types, handler, route, and tests for a complete API endpoint. Uses db wrapper, auto-sanitization, and <code>/api/v1/</code> prefix.</p>
+            <p class="command-desc">Scaffold types, handler, route, and tests for a complete API endpoint. Uses StrictDB, auto-sanitization, and <code>/api/v1/</code> prefix.</p>
           </div>
           <div class="command-card">
             <h3><code>/create-e2e &lt;feature&gt;</code></h3>
@@ -491,9 +491,9 @@ exit 0  # Allow</code></pre>
         <p>Wire it in <code>.claude/settings.json</code> under the appropriate lifecycle event and matcher.</p>
       </section>
 
-      <!-- Part 5: Database Wrapper -->
-      <section id="database-wrapper">
-        <h2>Part 5: Database Wrapper</h2>
+      <!-- Part 5: StrictDB Database Layer -->
+      <section id="strictdb-database-layer">
+        <h2>Part 5: StrictDB Database Layer</h2>
 
         <h3>Why StrictDB Exists</h3>
         <div class="callout" style="background: var(--bg-secondary); border-left: 4px solid var(--accent-cyan); padding: 1rem 1.25rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
@@ -501,65 +501,77 @@ exit 0  # Allow</code></pre>
         </div>
 
         <h3>Reading Data</h3>
-        <pre class="language-typescript"><code class="language-typescript">import { queryOne, queryMany, queryWithLookup, count } from '@/core/db/index.js';
+        <pre class="language-typescript"><code class="language-typescript">import { StrictDB } from 'strictdb';
+
+const db = StrictDB.getInstance();
 
 // Single document (works with MongoDB, PostgreSQL, SQLite, etc.)
-const user = await queryOne&lt;User&gt;('users', { email: 'test@example.com' });
+const user = await db.queryOne&lt;User&gt;('users', { email: 'test@example.com' });
 
 // Filtered query with options (filter, then options object)
-const recentOrders = await queryMany&lt;Order&gt;('orders',
+const recentOrders = await db.queryMany&lt;Order&gt;('orders',
   { userId, status: 'active' },
   { sort: { createdAt: -1 }, limit: 20 },
 );
 
 // Join across collections/tables
-const userWithOrders = await queryWithLookup&lt;UserWithOrders&gt;('users', {
+const userWithOrders = await db.queryWithLookup&lt;UserWithOrders&gt;('users', {
   match: { _id: userId },
   lookup: { from: 'orders', localField: '_id', foreignField: 'userId', as: 'orders' },
   unwind: 'orders',
 });
 
 // Count
-const total = await count('users', { role: 'admin' });</code></pre>
+const total = await db.count('users', { role: 'admin' });</code></pre>
 
         <h3>Writing Data</h3>
-        <pre class="language-typescript"><code class="language-typescript">import { insertOne, insertMany, updateOne, batch, deleteOne } from '@/core/db/index.js';
+        <pre class="language-typescript"><code class="language-typescript">import { StrictDB } from 'strictdb';
 
-await insertOne('users', { email, name, createdAt: new Date() });
-await insertMany('events', batchOfEvents);
+const db = StrictDB.getInstance();
+
+await db.insertOne('users', { email, name, createdAt: new Date() });
+await db.insertMany('events', batchOfEvents);
 
 // Use $inc for counters — NEVER read-modify-write
-await updateOne&lt;Stats&gt;('stats', { date }, { $inc: { pageViews: 1 } }, true);
+await db.updateOne&lt;Stats&gt;('stats', { date }, { $inc: { pageViews: 1 } }, true);
 
 // Batch operations (array of typed operations)
-await batch([
+await db.batch([
   { operation: 'updateOne', collection: 'sessions', filter: { sessionId }, update: { $inc: { events: 1 } } },
   { operation: 'deleteOne', collection: 'tokens', filter: { token: expiredToken } },
 ]);
 
-await deleteOne('tokens', { token: expiredToken });</code></pre>
+await db.deleteOne('tokens', { token: expiredToken });</code></pre>
 
         <h3>AI-First Discovery</h3>
-        <pre class="language-typescript"><code class="language-typescript">import { describe, validate, explain } from '@/core/db/index.js';
+        <pre class="language-typescript"><code class="language-typescript">import { StrictDB } from 'strictdb';
+
+const db = StrictDB.getInstance();
 
 // Discover schema — fields, indexes, document count
-const schema = await describe('users');
+const schema = await db.describe('users');
 
 // Dry-run validation — catches errors before execution
-const check = await validate('users', { doc: { email: 'test@test.com' } });
+const check = await db.validate('users', { doc: { email: 'test@test.com' } });
 
 // See the native query that would run
-const plan = await explain('users', { filter: { role: 'admin' }, limit: 50 });</code></pre>
+const plan = await db.explain('users', { filter: { role: 'admin' }, limit: 50 });</code></pre>
+
+        <div class="callout" style="background: var(--bg-secondary); border-left: 4px solid var(--accent-purple); padding: 1rem 1.25rem; border-radius: 0.5rem; margin: 1.5rem 0;">
+          <strong>Recommended MCP Server:</strong> Install <a href="https://www.npmjs.com/package/strictdb-mcp" target="_blank" rel="noopener">StrictDB-MCP</a> to give Claude direct database awareness &mdash; schema discovery, query validation, and AI-first database workflows right in your editor.
+        </div>
 
         <h3>Graceful Shutdown</h3>
-        <pre class="language-typescript"><code class="language-typescript">import { gracefulShutdown } from '@/core/db/index.js';
+        <pre class="language-typescript"><code class="language-typescript">import { StrictDB } from 'strictdb';
+
+const db = StrictDB.getInstance();
 
 // Closes all database connections (MongoDB, PostgreSQL, SQLite, etc.)
-process.on('SIGTERM', () =&gt; gracefulShutdown(0));
-process.on('SIGINT', () =&gt; gracefulShutdown(0));
+process.on('SIGTERM', () =&gt; db.gracefulShutdown(0));
+process.on('SIGINT', () =&gt; db.gracefulShutdown(0));
 process.on('uncaughtException', (err) =&gt; {
   console.error('Uncaught Exception:', err);
-  gracefulShutdown(1);
+  db.gracefulShutdown(1);
 });</code></pre>
       </section>
 
@@ -756,7 +768,7 @@ CMD ["node", "dist/index.js"]</code></pre>
           </div>
           <div class="troubleshooting-item">
             <h4>Too many open connections</h4>
-            <p>You're creating direct database clients outside StrictDB. Always import from <code>@/core/db/index.js</code>.</p>
+            <p>You're creating direct database clients outside StrictDB. Always use <code>import { StrictDB } from 'strictdb'</code> and call methods on the instance.</p>
           </div>
           <div class="troubleshooting-item">
             <h4>"BLOCKED: You're on main"</h4>

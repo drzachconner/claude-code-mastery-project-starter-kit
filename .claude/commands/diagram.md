@@ -88,7 +88,7 @@ Scan the project and generate a system overview diagram.
 │                                   ▼                         │
 │                            ┌───────────┐                   │
 │                            │ MongoDB   │                   │
-│                            │ (wrapper) │                   │
+│                            │ (StrictDB)│                   │
 │                            └───────────┘                   │
 │                                                              │
 │   ┌───────────┐   reads    ┌───────────┐                  │

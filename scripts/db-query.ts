@@ -13,22 +13,22 @@
  *
  * WHY THIS PATTERN:
  * - Keeps test/dev database code COMPLETELY separate from production code
- * - Every query uses the StrictDB wrapper (src/core/db/) — no raw driver imports
+ * - Every query receives a shared StrictDB instance — no raw driver imports
  * - Easy to see at a glance what queries exist and what they do
  * - Individual files are easy to review, modify, and delete
  * - Production code in src/ never touches this — clean separation
  *
  * RULES:
- * - EVERY query file MUST import from '@/core/db/index.js' (the StrictDB wrapper)
- * - NEVER import 'strictdb' or native drivers directly in query files
+ * - EVERY query file MUST accept a StrictDB instance as its first parameter
+ * - NEVER import native database drivers directly in query files
  * - NEVER copy query logic into production code — if you need it in prod,
  *   create a proper handler in src/handlers/
- * - Each query file exports: { name, description, run(args) }
+ * - Each query file exports: { name, description, run(db, args) }
  *
  * Install: npm install tsx -D (if not already installed)
  */
 
-import { closePool } from '../src/core/db/index.js';
+import { StrictDB } from 'strictdb';
 
 // ---------------------------------------------------------------------------
 // Query registry — add new queries here
@@ -37,7 +37,7 @@ import { closePool } from '../src/core/db/index.js';
 interface QueryModule {
   name: string;
   description: string;
-  run: (args: string[]) => Promise<void>;
+  run: (db: StrictDB, args: string[]) => Promise<void>;
 }
 
 /**
@@ -73,7 +73,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  // List all queries
+  // List all queries (no DB connection needed for listing)
   if (command === '--list' || command === '-l') {
     await listQueries();
     return;
@@ -87,17 +87,19 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  const db = await StrictDB.create({ uri: process.env.STRICTDB_URI! });
+
   try {
     const mod = await loader();
     const query = mod.default;
     console.log(`\n  Running: ${query.name}`);
     console.log(`  ${query.description}\n`);
-    await query.run(args.slice(1));
+    await query.run(db, args.slice(1));
   } catch (err) {
     console.error('\n  Query failed:', err);
     process.exit(1);
   } finally {
-    await closePool();
+    await db.close();
   }
 }
 
@@ -133,7 +135,6 @@ async function listQueries(): Promise<void> {
   }
 
   console.log('');
-  await closePool();
 }
 
 main().catch((err) => {

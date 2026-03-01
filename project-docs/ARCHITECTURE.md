@@ -64,7 +64,7 @@ Describe how data moves through your system:
 ## If You Are About To...
 
 - Add an endpoint to the wrong service → **STOP. Check the table above.**
-- Create a direct database connection → **STOP. Use the centralized wrapper.**
+- Create a direct database connection → **STOP. Use StrictDB.**
 - Skip TypeScript for a quick fix → **STOP. TypeScript is non-negotiable.**
 - Deploy without tests → **STOP. Write tests first.**
 

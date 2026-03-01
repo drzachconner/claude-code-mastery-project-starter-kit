@@ -56,16 +56,16 @@ All new code MUST be TypeScript with strict mode. When editing existing JavaScri
 
 ---
 
-## ADR-002: Centralized Database Wrapper (StrictDB)
+## ADR-002: StrictDB for All Database Access
 
 **Date:** (today)
-**Status:** Accepted (updated: migrated from custom wrappers to StrictDB)
+**Status:** Accepted
 
 ### Context
-Without a centralized wrapper, each file creates its own database connection, leading to connection pool exhaustion. Originally solved with custom MongoDB + SQL wrappers (~1,170 lines combined). Migrated to StrictDB — a unified driver supporting MongoDB, PostgreSQL, MySQL, MSSQL, SQLite, and Elasticsearch through a single API.
+Without centralized database access, each file creates its own connection, leading to pool exhaustion. This starter kit originally shipped a custom database adapter that evolved into StrictDB — a standalone npm package and unified driver supporting MongoDB, PostgreSQL, MySQL, MSSQL, SQLite, and Elasticsearch through a single API.
 
 ### Decision
-All database access goes through `src/core/db/index.ts`, a thin adapter around StrictDB. No other file may import `strictdb` or native database drivers directly.
+All database access uses StrictDB directly. Install `strictdb` + your database driver, create a single `StrictDB` instance at app startup, and share it across the application. NEVER import native database drivers (`mongodb`, `pg`, etc.) directly.
 
 ### Consequences
 - Single connection pool prevents exhaustion
@@ -73,3 +73,4 @@ All database access goes through `src/core/db/index.ts`, a thin adapter around S
 - Easy to mock for testing
 - One API for all backends — switching databases requires only changing STRICTDB_URI
 - Built-in sanitization, guardrails, and AI-first discovery (describe, validate, explain)
+- StrictDB-MCP server gives AI agents direct database access with all guardrails enforced

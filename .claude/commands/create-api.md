@@ -33,13 +33,12 @@ git branch --show-current
 Before scaffolding, read the current project:
 
 1. **Read `src/server.ts`** (or `src/server.js`, `src/index.ts`) — understand the server setup
-2. **Read `src/core/db/index.ts`** — confirm the db wrapper is available
-3. **Scan `src/routes/`** — check for existing route patterns to follow
-4. **Scan `src/handlers/`** — check for existing handler patterns
-5. **Scan `src/types/`** — check for existing type patterns
-6. **Read `.env.example`** — check for database config
+2. **Scan `src/routes/`** — check for existing route patterns to follow
+3. **Scan `src/handlers/`** — check for existing handler patterns
+4. **Scan `src/types/`** — check for existing type patterns
+5. **Read `.env.example`** — check for database config
 
-If `--no-db` is in the arguments, skip database integration. Otherwise, use the StrictDB wrapper by default.
+If `--no-db` is in the arguments, skip database integration. Otherwise, use StrictDB directly.
 
 ## Step 2 — Create Files
 
@@ -78,25 +77,20 @@ export interface <Resource>Response {
 ### File 2: `src/handlers/<resource>.ts` — Business logic
 
 ```typescript
-import {
-  queryOne,
-  queryMany,
-  insertOne,
-  updateOne,
-  deleteOne,
-  count,
-  registerCollection,
-} from '../core/db/index.js';
+import type { StrictDB } from 'strictdb';
 import type { <Resource>Doc, Create<Resource>Body, Update<Resource>Body, <Resource>Response } from '../types/<resource>.js';
 
 // ---------------------------------------------------------------------------
-// Schema + indexes — registered at import time, created at startup via ensureIndexes()
+// Schema + indexes — registered at startup via db.ensureIndexes()
 // ---------------------------------------------------------------------------
 
-registerCollection({
-  name: '<resources>',
-  indexes: [{ collection: '<resources>', fields: { createdAt: -1 } }],
-});
+// Called once at app startup with the shared StrictDB instance
+export function register<Resource>Schema(db: StrictDB) {
+  db.registerCollection({
+    name: '<resources>',
+    indexes: [{ collection: '<resources>', fields: { createdAt: -1 } }],
+  });
+}
 // Add more indexes based on query patterns
 
 // ---------------------------------------------------------------------------
@@ -116,29 +110,28 @@ function toResponse(doc: <Resource>Doc): <Resource>Response {
 }
 
 // ---------------------------------------------------------------------------
-// CRUD operations
+// CRUD operations — all receive the shared StrictDB instance
 // ---------------------------------------------------------------------------
 
-export async function create<Resource>(body: Create<Resource>Body): Promise<<Resource>Response> {
+export async function create<Resource>(db: StrictDB, body: Create<Resource>Body): Promise<<Resource>Response> {
   const now = new Date();
   const doc: Omit<<Resource>Doc, '_id'> = {
     ...body,
     createdAt: now,
     updatedAt: now,
   };
-  await insertOne(COLLECTION, doc);
-  // Re-query to get the _id (insertOne uses bulkWrite, no insertedId)
-  const created = await queryOne<<Resource>Doc>(COLLECTION, { createdAt: now });
+  await db.insertOne(COLLECTION, doc);
+  const created = await db.queryOne<<Resource>Doc>(COLLECTION, { createdAt: now });
   if (!created) throw new Error('Failed to create resource');
   return toResponse(created);
 }
 
-export async function get<Resource>ById(id: string): Promise<<Resource>Response | null> {
-  const doc = await queryOne<<Resource>Doc>(COLLECTION, { _id: id });
+export async function get<Resource>ById(db: StrictDB, id: string): Promise<<Resource>Response | null> {
+  const doc = await db.queryOne<<Resource>Doc>(COLLECTION, { _id: id });
   return doc ? toResponse(doc) : null;
 }
 
-export async function list<Resource>s(options: {
+export async function list<Resource>s(db: StrictDB, options: {
   page?: number;
   limit?: number;
   sort?: Record<string, 1 | -1>;
@@ -148,31 +141,32 @@ export async function list<Resource>s(options: {
   const sort = options.sort ?? { createdAt: -1 };
 
   const [docs, total] = await Promise.all([
-    queryMany<<Resource>Doc>(COLLECTION, [
+    db.queryMany<<Resource>Doc>(COLLECTION, [
       { $sort: sort },
       { $skip: (page - 1) * limit },
       { $limit: limit },
     ]),
-    count(COLLECTION),
+    db.count(COLLECTION),
   ]);
 
   return { data: docs.map(toResponse), total, page, limit };
 }
 
 export async function update<Resource>(
+  db: StrictDB,
   id: string,
   body: Update<Resource>Body
 ): Promise<<Resource>Response | null> {
   const filter = { _id: id };
-  await updateOne(COLLECTION, filter, {
+  await db.updateOne(COLLECTION, filter, {
     $set: { ...body, updatedAt: new Date() },
   });
-  const updated = await queryOne<<Resource>Doc>(COLLECTION, filter);
+  const updated = await db.queryOne<<Resource>Doc>(COLLECTION, filter);
   return updated ? toResponse(updated) : null;
 }
 
-export async function delete<Resource>(id: string): Promise<boolean> {
-  await deleteOne(COLLECTION, { _id: id });
+export async function delete<Resource>(db: StrictDB, id: string): Promise<boolean> {
+  await db.deleteOne(COLLECTION, { _id: id });
   return true;
 }
 ```
@@ -347,7 +341,7 @@ Every generated endpoint MUST follow these rules:
 ### Performance
 - Pagination on ALL list endpoints (default 20, max 100)
 - Indexes registered for all query patterns (`registerCollection()`)
-- Uses shared connection pool via db wrapper (NEVER creates new connections)
+- Uses shared StrictDB instance (NEVER creates new connections)
 - `$limit` enforced before `$lookup` in any join queries
 
 ### Architecture
@@ -362,7 +356,7 @@ Every generated endpoint MUST follow these rules:
 - Proper HTTP status codes (201 created, 204 no content, 404 not found)
 - JSON responses on all endpoints (including errors)
 - No callback-style code — async/await only
-- Uses the project's shared StrictDB instance (never creates its own)
+- Receives the shared StrictDB instance (never creates its own)
 
 ## Step 4 — Verification Checklist
 
@@ -380,7 +374,7 @@ After generating, verify:
 - [ ] No file exceeds 300 lines
 - [ ] _id never exposed — mapped to id string
 - [ ] All errors caught and logged
-- [ ] Uses db wrapper imports (NEVER raw StrictDB or driver imports)
+- [ ] Uses StrictDB instance methods directly (NEVER raw driver imports)
 
 ## RuleCatch Report
 

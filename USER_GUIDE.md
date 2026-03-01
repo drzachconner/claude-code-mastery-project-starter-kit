@@ -134,7 +134,7 @@ my-app/
 └── .dockerignore       ← Keeps secrets out of images
 ```
 
-The `default` profile adds more: `src/core/db/index.ts` (StrictDB database layer), `package.json`, `tsconfig.json`, `playwright.config.ts`, `vitest.config.ts`, and framework-specific files.
+The `default` profile adds more: StrictDB (database layer, installed as an npm package), `package.json`, `tsconfig.json`, `playwright.config.ts`, `vitest.config.ts`, and framework-specific files.
 
 ---
 
@@ -271,7 +271,7 @@ Systematic code review against a 7-point checklist:
 3. **Error Handling** — No swallowed errors
 4. **Performance** — No N+1 queries, no memory leaks
 5. **Testing** — New code has explicit assertions
-6. **Database** — Using centralized wrapper
+6. **Database** — Using StrictDB correctly
 7. **API Versioning** — All endpoints use `/api/v1/`
 
 Issues are reported with severity levels:
@@ -292,7 +292,7 @@ Audits a file against **every rule** in CLAUDE.md, then refactors:
 4. TypeScript — removes `any`, adds explicit types
 5. Import hygiene — no barrel imports, proper `import type`
 6. Error handling — no swallowed errors
-7. Database access — wrapper only
+7. Database access — StrictDB only
 8. API routes — `/api/v1/` prefix
 9. Promise.all — parallelizes independent awaits
 10. Security + dead code — removes unused code, checks for secrets
@@ -343,7 +343,7 @@ Full project scaffolding with profiles:
 /new-project my-app django             # Django full-stack
 ```
 
-Each profile configures the right language rules, frameworks, database wrappers, test infrastructure, and build tools. The `clean` profile gives you all AI tooling with zero coding opinions.
+Each profile configures the right language rules, frameworks, database integration (StrictDB), test infrastructure, and build tools. The `clean` profile gives you all AI tooling with zero coding opinions.
 
 #### `/create-api <resource>`
 
@@ -696,35 +696,39 @@ Then wire it up in `.claude/settings.json`:
 
 The #1 database failure in AI-assisted development is **connection pool exhaustion**. Without a centralized layer, Claude creates new database clients in every file that needs database access. Each client opens its own connection pool. During development with hot reload, connections multiply until the database rejects new connections.
 
-StrictDB solves this with a **singleton pattern** — one pool per URI, shared across the entire application. It provides a unified API across database engines (MongoDB, PostgreSQL, MySQL, SQLite) so you write the same `queryOne`, `queryMany`, `insertOne` calls regardless of backend.
+StrictDB solves this with a **singleton pattern** — one pool per URI, shared across the entire application. It provides a unified API across database engines (MongoDB, PostgreSQL, MySQL, SQLite) so you write the same `db.queryOne`, `db.queryMany`, `db.insertOne` calls regardless of backend.
+
+> **Tip:** Install [StrictDB-MCP](https://www.npmjs.com/package/strictdb-mcp) as an MCP server to give Claude direct database awareness — schema discovery, query validation, and AI-first database workflows right in your editor.
 
 ### Database Cookbook
 
-All database access goes through `src/core/db/index.ts`. No exceptions. Set `STRICTDB_URI` in your `.env` to point at any supported database engine.
+All database access goes through StrictDB (installed as an npm package: `npm install strictdb`). No exceptions. Set `STRICTDB_URI` in your `.env` to point at any supported database engine.
 
 #### Reading Data
 
 ```typescript
-import { queryOne, queryMany, count } from '@/core/db/index.js';
+import { StrictDB } from 'strictdb';
+
+const db = StrictDB.getInstance();
 
 // Single document/row lookup
-const user = await queryOne<User>('users', { email: 'test@example.com' });
+const user = await db.queryOne<User>('users', { email: 'test@example.com' });
 
 // Multiple documents/rows with sort and limit
-const recentOrders = await queryMany<Order>('orders',
+const recentOrders = await db.queryMany<Order>('orders',
   { userId, status: 'active' },
   { sort: { createdAt: -1 }, limit: 20 }
 );
 
 // Join with lookup (limit enforced before lookup automatically)
-const userWithOrders = await queryWithLookup<UserWithOrders>('users', {
+const userWithOrders = await db.queryWithLookup<UserWithOrders>('users', {
   match: { _id: userId },
   lookup: { from: 'orders', localField: '_id', foreignField: 'userId', as: 'orders' },
   unwind: 'orders',
 });
 
 // Count
-const totalAdmins = await count('users', { role: 'admin' });
+const totalAdmins = await db.count('users', { role: 'admin' });
 ```
 
 #### Writing Data
@@ -732,53 +736,59 @@ const totalAdmins = await count('users', { role: 'admin' });
 Every write returns an `OperationReceipt` with `{ acknowledged, matchedCount, modifiedCount, insertedId }` so you can verify the operation succeeded.
 
 ```typescript
-import { insertOne, insertMany, updateOne, batch, deleteOne } from '@/core/db/index.js';
+import { StrictDB } from 'strictdb';
+
+const db = StrictDB.getInstance();
 
 // Insert — returns OperationReceipt with insertedId
-const receipt = await insertOne('users', { email, name, createdAt: new Date() });
+const receipt = await db.insertOne('users', { email, name, createdAt: new Date() });
 console.log(receipt.insertedId);
 
-await insertMany('events', batchOfEvents);
+await db.insertMany('events', batchOfEvents);
 
 // Update — use $inc for counters (never read-modify-write)
-const updateReceipt = await updateOne<User>('users', { _id: userId }, { $set: { name: 'New Name' } });
+const updateReceipt = await db.updateOne<User>('users', { _id: userId }, { $set: { name: 'New Name' } });
 console.log(updateReceipt.modifiedCount); // 1
 
-await updateOne<Stats>('stats', { date }, { $inc: { pageViews: 1 } }, true); // upsert
+await db.updateOne<Stats>('stats', { date }, { $inc: { pageViews: 1 } }, true); // upsert
 
 // Batch operations (auto-retries concurrent races)
-await batch('sessions', [
+await db.batch('sessions', [
   { updateOne: { filter: { sessionId }, update: { $inc: { events: 1 } }, upsert: true } },
   { updateOne: { filter: { sessionId }, update: { $set: { lastSeen: new Date() } } } },
 ]);
 
 // Delete
-await deleteOne('tokens', { token: expiredToken });
+await db.deleteOne('tokens', { token: expiredToken });
 ```
 
 #### Connection Pool Presets
 
 ```typescript
-import { connect } from '@/core/db/index.js';
+import { StrictDB } from 'strictdb';
+
+const db = StrictDB.getInstance();
 
 // StrictDB manages pools per URI — choose a preset based on workload
-await connect(undefined, { pool: 'high', label: 'API' });      // 20 connections
-await connect(undefined, { pool: 'standard', label: 'Web' });   // 10 connections
-await connect(undefined, { pool: 'low', label: 'Worker' });     // 5 connections
+await db.connect(undefined, { pool: 'high', label: 'API' });      // 20 connections
+await db.connect(undefined, { pool: 'standard', label: 'Web' });   // 10 connections
+await db.connect(undefined, { pool: 'low', label: 'Worker' });     // 5 connections
 ```
 
 #### Index Management
 
 ```typescript
-import { registerIndex, ensureIndexes } from '@/core/db/index.js';
+import { StrictDB } from 'strictdb';
+
+const db = StrictDB.getInstance();
 
 // Register at module load time
-registerIndex({ collection: 'users', fields: { email: 1 }, unique: true });
-registerIndex({ collection: 'sessions', fields: { userId: 1, startedAt: -1 } });
-registerIndex({ collection: 'tokens', fields: { expiresAt: 1 }, expireAfterSeconds: 0 });
+db.registerIndex({ collection: 'users', fields: { email: 1 }, unique: true });
+db.registerIndex({ collection: 'sessions', fields: { userId: 1, startedAt: -1 } });
+db.registerIndex({ collection: 'tokens', fields: { expiresAt: 1 }, expireAfterSeconds: 0 });
 
 // Call once at startup
-await ensureIndexes();
+await db.ensureIndexes();
 ```
 
 StrictDB skips indexes that already exist, so `ensureIndexes()` is safe to call every startup.
@@ -796,14 +806,15 @@ Create query files in `scripts/queries/`:
 
 ```typescript
 // scripts/queries/find-expired-sessions.ts
-import { queryMany } from '../../src/core/db/index.js';
+import { StrictDB } from 'strictdb';
 
 export default {
   name: 'find-expired-sessions',
   description: 'Find sessions that expired in the last 24 hours',
   async run(args: string[]): Promise<void> {
+    const db = StrictDB.getInstance();
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const sessions = await queryMany('sessions',
+    const sessions = await db.queryMany('sessions',
       { expiresAt: { $lt: cutoff } },
       { sort: { expiresAt: -1 }, limit: 50 }
     );
@@ -819,23 +830,25 @@ Register in `scripts/db-query.ts` and run. Production code stays clean — test 
 **Mandatory for every Node.js entry point:**
 
 ```typescript
-import { gracefulShutdown } from '@/core/db/index.js';
+import { StrictDB } from 'strictdb';
 
-process.on('SIGTERM', () => gracefulShutdown(0));
-process.on('SIGINT', () => gracefulShutdown(0));
+const db = StrictDB.getInstance();
+
+process.on('SIGTERM', () => db.gracefulShutdown(0));
+process.on('SIGINT', () => db.gracefulShutdown(0));
 
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
-  gracefulShutdown(1);
+  db.gracefulShutdown(1);
 });
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
-  gracefulShutdown(1);
+  db.gracefulShutdown(1);
 });
 ```
 
-`gracefulShutdown()` is idempotent — safe to call from multiple signals. It closes all database connections managed by StrictDB before exiting.
+`db.gracefulShutdown()` is idempotent — safe to call from multiple signals. It closes all database connections managed by StrictDB before exiting.
 
 ---
 
@@ -1083,7 +1096,7 @@ pnpm test:kill-ports
 
 **"Too many open connections"**
 - You're probably creating database clients outside StrictDB — don't
-- Always use `import { queryOne, insertOne } from '@/core/db/index.js'`
+- Always use `import { StrictDB } from 'strictdb'` and call methods on the instance
 - Check for hot-reload connection leaks — StrictDB handles this with `globalThis`
 
 **Connection works locally but fails in Docker**
@@ -1186,7 +1199,7 @@ A: StrictDB is recommended for AI-assisted development because it provides a sim
 A: StrictDB supports multiple connections via different URIs. Call `connect()` with different URIs and labels. Each gets its own pool.
 
 **Q: How do I switch database engines (e.g., MongoDB to PostgreSQL)?**
-A: Change `STRICTDB_URI` in `.env` to point at the new engine (e.g., `STRICTDB_URI=postgresql://...`). StrictDB auto-detects the driver from the URI scheme. Your `queryOne`, `queryMany`, `insertOne` calls stay the same.
+A: Change `STRICTDB_URI` in `.env` to point at the new engine (e.g., `STRICTDB_URI=postgresql://...`). StrictDB auto-detects the driver from the URI scheme. Your `db.queryOne`, `db.queryMany`, `db.insertOne` calls stay the same.
 
 ### Testing
 

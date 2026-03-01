@@ -175,8 +175,8 @@ Only ask about categories where the target has existing files. Use AskUserQuesti
   - No, leave it untouched
 
 **Q7: Language-specific** (based on `$LANGUAGE`)
-- Node.js: "Want the database wrapper (src/core/db/)? Test configs (vitest, playwright)? Merge scripts into package.json?"
-  - Yes, add database wrapper + test configs + merge scripts (Recommended)
+- Node.js: "Want StrictDB (database layer)? Test configs (vitest, playwright)? Merge scripts into package.json?"
+  - Yes, add StrictDB + test configs + merge scripts (Recommended)
   - Just merge scripts into package.json
   - No, skip language-specific files
 - Go: "Want Go-specific coding standards added to CLAUDE.md?"
@@ -350,9 +350,8 @@ Report each file: `+ copied`, `merged (N lines added)`, or `skipped (exists)`
 
 ### Node.js (if `$LANGUAGE` is Node.js and user opted in)
 
-**Database wrapper** (if user chose "yes, add database wrapper"):
-- Create `$TARGET/src/core/db/` directory
-- Copy `$SOURCE/src/core/db/index.ts` if missing in target
+**StrictDB** (if user chose "yes, add StrictDB"):
+- Install StrictDB as a dependency: `cd "$TARGET" && npm install strictdb@^0.1.0`
 
 **Test configs** (if user chose "yes"):
 - Copy `$SOURCE/vitest.config.ts` if missing in target
@@ -387,7 +386,7 @@ Report each file: `+ copied`, `merged (N lines added)`, or `skipped (exists)`
 After language-specific files are copied, auto-detect which features were installed and write a manifest.
 
 1. Check which feature-related files now exist in `$TARGET`:
-   - `src/core/db/index.ts` → feature `mongo` (or `postgres` — StrictDB handles both)
+   - `strictdb` in `package.json` dependencies → feature `mongo` (or `postgres` — StrictDB handles both)
    - `vitest.config.ts` → feature `vitest`
    - `playwright.config.ts` → feature `playwright`
    - `scripts/build-content.ts` → feature `content`

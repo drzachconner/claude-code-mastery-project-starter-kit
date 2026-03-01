@@ -93,14 +93,14 @@ Use `/help` to see all 27 commands at any time.
 
 Everything you need to start a Claude Code project the right way — security, automation, documentation, and testing all pre-configured.
 
-- **CLAUDE.md** — Battle-tested project instructions with 11 numbered critical rules for security, TypeScript, database wrappers, testing, and deployment
+- **CLAUDE.md** — Battle-tested project instructions with 11 numbered critical rules for security, TypeScript, database access, testing, and deployment
 - **Global CLAUDE.md** — Security gatekeeper for all projects. Never publish secrets, never commit .env files, standardized scaffolding rules
 - **27 Slash Commands** (17 project + 10 kit management) — `/mdd`, `/help`, `/quickstart`, `/install-global`, `/setup`, `/show-user-guide`, `/diagram`, `/review`, `/commit`, `/progress`, `/test-plan`, `/architecture`, `/new-project`, `/security-check`, `/optimize-docker`, `/create-e2e`, `/create-api`, `/worktree`, `/what-is-my-ai-doing`, `/refactor`, `/set-project-profile-default`, `/add-project-setup`, `/projects-created`, `/remove-project`, `/convert-project-to-starter-kit`, `/update-project`, `/add-feature`
 - **9 Hooks** — Deterministic enforcement that always runs. Block secrets, lint on save, verify no credentials, branch protection, port conflicts, Rybbit pre-deploy gate, E2E test gate, env sync warnings, and RuleCatch monitoring (optional — skips silently if not installed)
 - **Skills** — Context-aware templates: systematic code review checklist and full microservice scaffolding
 - **Custom Agents** — Read-only code reviewer for security audits. Test writer that creates tests with explicit assertions
 - **Documentation Templates** — Pre-structured ARCHITECTURE.md, INFRASTRUCTURE.md, and DECISIONS.md templates
-- **Testing Templates** — Master test checklist, issue tracking log, and a unified database wrapper that prevents connection pool explosion
+- **Testing Templates** — Master test checklist, issue tracking log, and StrictDB integration that prevents connection pool explosion
 - **Live AI Monitor** — See every tool call, token, cost, and violation in real-time with `/what-is-my-ai-doing`. Free monitor mode works instantly — no API key, no account. Run `pnpm ai:monitor` in a separate terminal. Zero token overhead
 
 ## MDD Workflow — Manual-First Development ✨ NEW
@@ -190,9 +190,9 @@ The most important technical detail: when Claude reads files during an audit, co
 
 ## Featured Packages
 
-Three open-source npm packages by [TheDecipherist](https://github.com/TheDecipherist) — the same developer behind this starter kit — are integrated into the default build for CSS-enabled profiles. All are MIT-licensed.
+Four open-source npm packages by [TheDecipherist](https://github.com/TheDecipherist) — the same developer behind this starter kit — are integrated into the default build. All are MIT-licensed.
 
-> **Full disclosure:** These packages are developed by the same person who maintains this starter kit. They are completely open source (MIT license), and the starter kit works fully without them. ClassMCP and Classpresso are auto-included in CSS-enabled profiles because they directly complement the AI-assisted CSS workflow this kit teaches. TerseJSON is documented but not auto-included.
+> **Full disclosure:** These packages are developed by the same person who maintains this starter kit. They are completely open source (MIT license), and the starter kit works fully without them. ClassMCP and Classpresso are auto-included in CSS-enabled profiles because they directly complement the AI-assisted CSS workflow this kit teaches. StrictDB-MCP is auto-included in database-enabled profiles. TerseJSON is documented but not auto-included.
 
 ### ClassMCP — Semantic CSS for AI
 
@@ -203,6 +203,16 @@ claude mcp add classmcp -- npx -y classmcp@latest
 ```
 
 npm: [classmcp](https://www.npmjs.com/package/classmcp) · [Website](https://classmcp.com?utm_source=github&utm_medium=readme&utm_campaign=classmcp&utm_content=featured-packages)
+
+### StrictDB-MCP (MCP Server) — Database Access for AI
+
+Gives AI agents direct database access through 14 MCP tools with full guardrails, sanitization, and error handling. Auto-included in database-enabled profiles (`mcp` field in `claude-mastery-project.conf`).
+
+```bash
+claude mcp add strictdb -- npx -y strictdb-mcp@latest
+```
+
+npm: [strictdb-mcp](https://www.npmjs.com/package/strictdb-mcp)
 
 ### Classpresso — Post-Build CSS Optimization
 
@@ -237,7 +247,7 @@ This starter kit works with any language, framework, or database. Use `/new-proj
 | **Backend (Node.js)** | Fastify, Express, Hono | API scaffolding with `/create-api` |
 | **Backend (Go)** | Gin, Chi, Echo, Fiber, stdlib | Standard layout with cmd/internal/ |
 | **Backend (Python)** | FastAPI, Django, Flask | Async support, Pydantic, pytest |
-| **Database** | MongoDB, PostgreSQL, MySQL, MSSQL, SQLite, Elasticsearch | Unified StrictDB wrapper for all backends |
+| **Database** | MongoDB, PostgreSQL, MySQL, MSSQL, SQLite, Elasticsearch | StrictDB for all backends |
 | **Hosting** | Dokploy, Vercel, Static (GitHub Pages, Netlify) | Deployment scripts + Docker |
 | **Testing** | Vitest, Playwright, pytest, Go test | Framework-appropriate test setup |
 | **CSS** | Tailwind CSS + ClassMCP + Classpresso | ClassMCP (MCP) + Classpresso (post-build) auto-included in CSS profiles |
@@ -308,7 +318,7 @@ cp .claude/hooks/check-rulecatch.sh ~/.claude/hooks/
 3. Run `/diagram all` — Auto-generate architecture, API, database, and infrastructure diagrams
 4. Edit `CLAUDE.local.md` — Add your personal preferences
 
-The database wrapper (`src/core/db/index.ts`) works out of the box — just set `STRICTDB_URI` in your `.env` and it connects to your database automatically. Built-in sanitization and guardrails run on all inputs: standard query operators pass through safely while dangerous operators are stripped. See the [Database Wrapper](#database-wrapper--strictdb) section for details.
+StrictDB works out of the box — just set `STRICTDB_URI` in your `.env` and it connects to your database automatically. Built-in sanitization and guardrails run on all inputs: standard query operators pass through safely while dangerous operators are stripped. See the [Database — StrictDB](#database--strictdb) section for details.
 
 ### 4. Start Building
 
@@ -432,9 +442,8 @@ project/
 ├── docs/                        # GitHub Pages site
 │   └── user-guide.html          # Interactive User Guide (HTML)
 ├── src/
-│   ├── core/db/index.ts         # Centralized database wrapper
 │   ├── handlers/                # Business logic
-│   ├── adapters/                # External service wrappers
+│   ├── adapters/                # External service adapters
 │   └── types/                   # Shared TypeScript types
 ├── scripts/
 │   ├── db-query.ts              # Test Query Master — dev/test query index
@@ -540,10 +549,10 @@ WRONG:   /api/users
 
 Every API endpoint MUST use `/api/v1/` prefix. No exceptions.
 
-### Rule 3: Database Access — Wrapper Only
+### Rule 3: Database Access — StrictDB Only
 
-- NEVER create direct database connections outside `src/core/db/`
-- ALWAYS use the centralized database wrapper
+- NEVER create direct database connections — ALWAYS use StrictDB
+- NEVER import raw database drivers (`mongodb`, `pg`, `mysql2`) in business logic
 - Built-in sanitization and guardrails: safe operators (`$gte`, `$in`, `$regex`) pass through, dangerous operators (`$where`, `$function`) are stripped
 - Use `{ trusted: true }` only for non-standard operators not in the allowlist (rare)
 - One connection pool. One place to change. One place to mock.
@@ -842,7 +851,7 @@ Systematic code review against a 7-point checklist:
 3. **Error Handling** — No swallowed errors
 4. **Performance** — No N+1 queries, no memory leaks
 5. **Testing** — New code has explicit assertions
-6. **Database** — Using centralized wrapper
+6. **Database** — Using StrictDB correctly
 7. **API Versioning** — All endpoints use `/api/v1/`
 
 Issues are reported with severity (Critical / Warning / Info), file:line references, and suggested fixes.
@@ -921,7 +930,7 @@ Updates an existing starter-kit project with the latest commands, hooks, skills,
 Add capabilities (MongoDB, Docker, testing, etc.) to an existing project after scaffolding. Idempotent — safely updates already-installed features to the latest version. Maintains a feature manifest (`.claude/features.json`) so `/update-project` can sync feature files too.
 
 ```bash
-/add-feature mongo            # Add StrictDB wrapper + query system (MongoDB backend)
+/add-feature mongo            # Add StrictDB + query system (MongoDB backend)
 /add-feature vitest playwright # Add both test frameworks
 /add-feature --list           # Show all available features
 ```
@@ -939,7 +948,7 @@ Scaffolds a production-ready API endpoint with full CRUD:
 - **Route** — `src/routes/v1/<resource>.ts` (thin routes, proper HTTP status codes)
 - **Tests** — `tests/unit/<resource>.test.ts` (happy path, error cases, edge cases)
 
-Uses the StrictDB wrapper with shared pool, auto-sanitized inputs, pagination (max 100), registered indexes, and `/api/v1/` prefix. Pass `--no-mongo` to skip database integration.
+Uses StrictDB with shared pool, auto-sanitized inputs, pagination (max 100), registered indexes, and `/api/v1/` prefix. Pass `--no-mongo` to skip database integration.
 
 ### `/refactor`
 
@@ -951,7 +960,7 @@ Audit + refactor any file against **every rule** in CLAUDE.md:
 4. **TypeScript** — no `any`, explicit types, strict mode
 5. **Import hygiene** — no barrel imports, proper `import type`
 6. **Error handling** — no swallowed errors, proper logging
-7. **Database access** — wrapper only (`src/core/db/`)
+7. **Database access** — StrictDB only
 8. **API routes** — `/api/v1/` prefix
 9. **Promise.all** — parallelize independent awaits
 10. **Security + dead code** — no secrets, no unused code
@@ -983,7 +992,7 @@ Full project scaffolding with profiles:
 /new-project my-app django                 # Django full-stack
 ```
 
-**`clean`** — All Claude infrastructure (commands, skills, agents, hooks, project-docs, tests templates) with **zero coding opinions**. No TypeScript enforcement, no port assignments, no database wrapper, no quality gates. Your project, your rules — Claude just works.
+**`clean`** — All Claude infrastructure (commands, skills, agents, hooks, project-docs, tests templates) with **zero coding opinions**. No TypeScript enforcement, no port assignments, no database setup, no quality gates. Your project, your rules — Claude just works.
 
 **`go`** — Go project scaffolding with standard layout (cmd/, internal/), Gin router, Makefile builds, golangci-lint, table-driven tests, multi-stage Docker with scratch base (5-15MB images). Supports Gin, Chi, Echo, Fiber, or stdlib net/http.
 
@@ -1028,7 +1037,7 @@ Both skills and commands can cover similar ground (e.g., code review). Skills ar
 
 **Triggers:** `review`, `audit`, `check code`, `security review`
 
-A systematic review checklist covering security (OWASP, input validation, CORS, rate limiting), TypeScript quality (no `any`, explicit return types, strict mode), error handling (no swallowed errors, user-facing messages), performance (N+1 queries, memory leaks, pagination), and architecture compliance (database wrapper, API versioning, service separation). Each issue is reported with severity, location, fix, and **why it matters**.
+A systematic review checklist covering security (OWASP, input validation, CORS, rate limiting), TypeScript quality (no `any`, explicit return types, strict mode), error handling (no swallowed errors, user-facing messages), performance (N+1 queries, memory leaks, pagination), and architecture compliance (StrictDB usage, API versioning, service separation). Each issue is reported with severity, location, fix, and **why it matters**.
 
 ### Create Service Skill
 
@@ -1051,7 +1060,7 @@ Generates a complete microservice following the server/handlers/adapters separat
 │                       │                             │
 │                       ▼                             │
 │  ADAPTERS (adapters/)                               │
-│  → External service wrappers                        │
+│  → External service adapters                        │
 │  → Database, APIs, etc.                             │
 └─────────────────────────────────────────────────────┘
 ```
@@ -1103,22 +1112,21 @@ expect(result).toBeTruthy();  // too vague
 
 ---
 
-## Database Wrapper — StrictDB
+## Database — StrictDB
 
-The starter kit includes a **production-grade StrictDB wrapper** at `src/core/db/index.ts` using the unified driver (supports MongoDB, PostgreSQL, MySQL, MSSQL, SQLite, Elasticsearch). It enforces every best practice that prevents the most common database failures in AI-assisted development.
+The starter kit uses **StrictDB** directly (supports MongoDB, PostgreSQL, MySQL, MSSQL, SQLite, Elasticsearch). It enforces every best practice that prevents the most common database failures in AI-assisted development.
 
 ### The Absolute Rule
 
-**ALL database access goes through `src/core/db/index.ts`. No exceptions.** Never create direct database connections anywhere else. Never import database drivers directly in business logic.
+**ALL database access goes through StrictDB. No exceptions.** Never create direct database connections. Never import raw database drivers in business logic.
 
 ```typescript
-// CORRECT — import from the StrictDB wrapper
-import { queryOne, insertOne, updateOne } from '@/core/db/index.js';
+// CORRECT — use StrictDB directly
+import { queryOne, insertOne, updateOne } from 'strictdb';
 
 // WRONG — NEVER do this
-import { StrictDB } from 'strictdb';       // FORBIDDEN outside src/core/db/
-import { MongoClient } from 'mongodb';     // FORBIDDEN outside src/core/db/
-import { Pool } from 'pg';                 // FORBIDDEN outside src/core/db/
+import { MongoClient } from 'mongodb';     // FORBIDDEN
+import { Pool } from 'pg';                 // FORBIDDEN
 ```
 
 ### Reading Data — Aggregation Only
@@ -1204,7 +1212,7 @@ const latest = await queryOne('events', {
 
 ### `{ trusted: true }` — Escape Hatch
 
-If you need an operator not in the allowlist, `queryOne()`, `queryMany()`, and `count()` accept `{ trusted: true }` to skip sanitization entirely. This should be **rare** — if you find yourself using it frequently, add the operator to `SAFE_OPERATORS` in `src/core/db/index.ts` instead.
+If you need an operator not in the allowlist, `queryOne()`, `queryMany()`, and `count()` accept `{ trusted: true }` to skip sanitization entirely. This should be **rare** — if you find yourself using it frequently, add the operator to StrictDB's `SAFE_OPERATORS` configuration instead.
 
 ```typescript
 const results = await queryMany('collection', pipeline, { trusted: true });
@@ -1237,7 +1245,7 @@ const one = await queryOne('collection', match, { trusted: true });
 
 ```typescript
 // scripts/queries/find-expired-sessions.ts
-import { queryMany } from '../../src/core/db/index.js';
+import { queryMany } from 'strictdb';
 
 export default {
   name: 'find-expired-sessions',
@@ -1279,7 +1287,7 @@ Pre-structured docs that Claude actually follows. Each template uses the "STOP" 
 ```
 ## If You Are About To...
 - Add an endpoint to the wrong service → STOP. Check the table above.
-- Create a direct database connection → STOP. Use the wrapper.
+- Create a direct database connection → STOP. Use StrictDB.
 - Skip TypeScript for a quick fix → STOP. TypeScript is non-negotiable.
 - Deploy without tests → STOP. Write tests first.
 ```
@@ -1288,7 +1296,7 @@ Pre-structured docs that Claude actually follows. Each template uses the "STOP" 
 
 `project-docs/DECISIONS.md` — Architectural Decision Records (ADRs) that document **why** you chose X over Y. Includes two starter decisions:
 - **ADR-001: TypeScript Over JavaScript** — AI needs explicit type contracts to avoid guessing
-- **ADR-002: Centralized Database Wrapper** — prevents connection pool exhaustion
+- **ADR-002: StrictDB for Database Access** — prevents connection pool exhaustion
 
 Each ADR has: Context, Decision, Alternatives Considered (with pros/cons table), and Consequences.
 
@@ -1401,7 +1409,7 @@ The starter kit includes a complete global config template in `global-claude-md/
 
 - **Absolute Rules** — NEVER publish sensitive data. NEVER commit `.env` files. NEVER auto-deploy. NEVER hardcode credentials. NEVER rename without a plan. These apply to every project, every session.
 - **New Project Standards** — Every new project automatically gets: `.env` + `.env.example`, proper `.gitignore`, `.dockerignore`, TypeScript strict mode, `src/tests/project-docs/.claude/` directory structure.
-- **Coding Standards** — Error handling requirements, testing standards, quality gates, database wrapper pattern — all enforced across every project.
+- **Coding Standards** — Error handling requirements, testing standards, quality gates, StrictDB usage — all enforced across every project.
 - **Global Permission Denials** — The companion `settings.json` explicitly denies Claude access to `.env`, `.env.local`, `secrets.json`, `id_rsa`, and `credentials.json` at the permission level — before hooks even run.
 
 ---
@@ -1456,7 +1464,7 @@ Every plan step MUST have a unique, descriptive name:
 
 ```
 Step 1 (Project Setup): Initialize repo with TypeScript
-Step 2 (Database Layer): Create StrictDB wrapper
+Step 2 (Database Layer): Set up StrictDB
 Step 3 (Auth System): Implement JWT authentication
 ```
 
@@ -1621,6 +1629,23 @@ claude mcp add classmcp -- npx -y classmcp@latest
 ```
 
 npm: [classmcp](https://www.npmjs.com/package/classmcp) · [Website](https://classmcp.com?utm_source=github&utm_medium=readme&utm_campaign=classmcp&utm_content=mcp-servers)
+
+---
+
+### StrictDB-MCP — Database Access for AI
+
+> **Developed by [TheDecipherist](https://github.com/TheDecipherist)** — the same developer behind this starter kit. Open source (MIT license).
+
+Gives AI agents direct database access through 14 MCP tools with full guardrails, sanitization, and error handling. Instead of Claude generating raw queries or connection code, StrictDB-MCP provides structured tools for reading, writing, and managing data across all supported backends. Auto-included in database-enabled profiles.
+
+**What it solves:** Connection pool exhaustion, raw driver imports, unsanitized queries, missing graceful shutdown
+**How to use:** Install once — StrictDB-MCP provides database tools when Claude works with data
+
+```bash
+claude mcp add strictdb -- npx -y strictdb-mcp@latest
+```
+
+npm: [strictdb-mcp](https://www.npmjs.com/package/strictdb-mcp)
 
 ---
 

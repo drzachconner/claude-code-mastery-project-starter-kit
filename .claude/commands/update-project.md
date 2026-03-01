@@ -142,7 +142,7 @@ After the infrastructure diff above, also check for feature source files to upda
 1. Read `$TARGET/.claude/features.json`
 2. **If exists:** extract the list of installed features from `features` object
 3. **If missing (legacy project):** auto-detect features from file presence:
-   - `src/core/db/index.ts` exists → feature `mongo` (or `postgres` — StrictDB handles both)
+   - `strictdb` in `package.json` dependencies → feature `mongo` (or `postgres` — StrictDB handles both)
    - `vitest.config.ts` exists → feature `vitest`
    - `playwright.config.ts` exists → feature `playwright`
    - `scripts/build-content.ts` exists → feature `content`
@@ -164,7 +164,7 @@ After the infrastructure diff above, also check for feature source files to upda
 ```
 Feature Files:
   mongo:
-    ↻ UPDATED:   src/core/db/index.ts
+    ↻ UPDATED:   scripts/db-query.ts
     = UNCHANGED: scripts/db-query.ts, scripts/queries/*
   vitest:
     = UNCHANGED: vitest.config.ts

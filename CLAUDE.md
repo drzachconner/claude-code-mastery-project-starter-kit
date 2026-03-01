@@ -98,15 +98,13 @@ WRONG:   /api/users
 
 Every API endpoint MUST use `/api/v1/` prefix. No exceptions.
 
-### 3. Database Access — StrictDB Only (`src/core/db/index.ts`)
+### 3. Database Access — StrictDB
 
-**ABSOLUTE RULE: ALL database access goes through `src/core/db/index.ts`. No exceptions.**
+StrictDB started as this starter kit's custom database wrapper and evolved into a standalone npm package. Install `strictdb` + your database driver. Use `StrictDB.create()` directly. NEVER import native drivers (`mongodb`, `pg`, `mysql2`, `mssql`, `better-sqlite3`) — StrictDB handles everything.
 
-- NEVER import `strictdb`, `mongodb`, `pg`, `mysql2`, `mssql`, or `better-sqlite3` directly — only import from `src/core/db/`
-- NEVER create database connections anywhere else in the codebase
+- NEVER create database connections anywhere except your app's startup/entry point
 - NEVER use `mongoose` or any ODM
-- ALWAYS import from `src/core/db/` for all database operations
-- StrictDB has built-in sanitization and guardrails (enabled by default)
+- StrictDB has built-in sanitization, guardrails, and AI-first discovery
 - Backend auto-detected from `STRICTDB_URI` scheme — one API for all databases
 
 | URI Scheme | Backend |
@@ -118,84 +116,95 @@ Every API endpoint MUST use `/api/v1/` prefix. No exceptions.
 | `file:` `sqlite:` | SQLite |
 | `http://` `https://` | Elasticsearch |
 
-#### How to use the wrapper
+#### Setup
 
 ```typescript
-// CORRECT — import from the centralized wrapper
-import { queryOne, queryMany, insertOne, updateOne, batch, closePool } from '@/core/db/index.js';
+import { StrictDB } from 'strictdb';
 
-// WRONG — NEVER do this
-import { StrictDB } from 'strictdb';       // FORBIDDEN outside src/core/db/
-import { MongoClient } from 'mongodb';     // FORBIDDEN outside src/core/db/
-import { Pool } from 'pg';                 // FORBIDDEN outside src/core/db/
+// Create once at app startup, share the instance
+const db = await StrictDB.create({ uri: process.env.STRICTDB_URI! });
+```
+
+```typescript
+// CORRECT — use the StrictDB instance
+const user = await db.queryOne<User>('users', { email });
+
+// WRONG — NEVER import native drivers
+import { MongoClient } from 'mongodb';     // FORBIDDEN
+import { Pool } from 'pg';                 // FORBIDDEN
 ```
 
 #### Reading data
 
 ```typescript
 // Single document/row lookup
-const user = await queryOne<User>('users', { email });
+const user = await db.queryOne<User>('users', { email });
 
 // Multiple documents/rows with options
-const recentOrders = await queryMany<Order>('orders',
+const recentOrders = await db.queryMany<Order>('orders',
   { userId, status: 'active' },
   { sort: { createdAt: -1 }, limit: 20 },
 );
 
 // Lookup/join
-const userWithOrders = await queryWithLookup<UserWithOrders>('users', {
+const userWithOrders = await db.queryWithLookup<UserWithOrders>('users', {
   match: { _id: userId },
   lookup: { from: 'orders', localField: '_id', foreignField: 'userId', as: 'orders' },
   unwind: 'orders',
 });
 
 // Count
-const total = await count('users', { role: 'admin' });
+const total = await db.count('users', { role: 'admin' });
 ```
 
 #### Writing data
 
 ```typescript
 // Insert
-await insertOne('users', { email, name, createdAt: new Date() });
-await insertMany('events', batchOfEvents);
+await db.insertOne('users', { email, name, createdAt: new Date() });
+await db.insertMany('events', batchOfEvents);
 
 // Update — use $inc for counters, $set for fields (NEVER read-modify-write)
-await updateOne('users', { _id: userId }, { $set: { name: 'New Name' } });
-await updateOne('stats', { date }, { $inc: { pageViews: 1, visitors: 1 } }, true); // upsert
+await db.updateOne('users', { _id: userId }, { $set: { name: 'New Name' } });
+await db.updateOne('stats', { date }, { $inc: { pageViews: 1, visitors: 1 } }, true); // upsert
 
 // Batch operations
-await batch([
+await db.batch([
   { operation: 'insertOne', collection: 'orders', doc: { item: 'widget', qty: 5 } },
   { operation: 'updateOne', collection: 'inventory', filter: { sku: 'W1' }, update: { $inc: { stock: -5 } } },
 ]);
 
 // Delete
-await deleteOne('tokens', { token: expiredToken });
+await db.deleteOne('tokens', { token: expiredToken });
 ```
 
 #### AI-first discovery
 
 ```typescript
-import { describe, validate, explain } from '@/core/db/index.js';
-
 // Discover collection schema — call before querying unfamiliar collections
-const schema = await describe('users');
+const schema = await db.describe('users');
 
 // Dry-run validation — catches errors before execution
-const check = await validate('users', { filter: { role: 'admin' }, doc: { email: 'test@test.com' } });
+const check = await db.validate('users', { filter: { role: 'admin' }, doc: { email: 'test@test.com' } });
 
 // See the native query under the hood
-const plan = await explain('users', { filter: { role: 'admin' }, limit: 50 });
+const plan = await db.explain('users', { filter: { role: 'admin' }, limit: 50 });
 ```
+
+#### StrictDB-MCP — AI agents should use the `strictdb-mcp` MCP server for database operations. It exposes 14 tools with all guardrails enforced automatically:
+
+```bash
+claude mcp add strictdb -- npx -y strictdb-mcp@latest
+```
+
+Requires `STRICTDB_URI` in your environment.
 
 #### Schema registration with Zod
 
 ```typescript
-import { registerCollection, ensureIndexes } from '@/core/db/index.js';
 import { z } from 'zod';
 
-registerCollection({
+db.registerCollection({
   name: 'users',
   schema: z.object({
     email: z.string().max(255),
@@ -206,7 +215,7 @@ registerCollection({
 });
 
 // Call once at app startup
-await ensureIndexes();
+await db.ensureIndexes();
 ```
 
 #### Graceful shutdown — MANDATORY for every Node.js entry point
@@ -215,24 +224,22 @@ ANY crash or termination signal MUST close database connections before exiting.
 NEVER call `process.exit()` without closing connections first.
 
 ```typescript
-import { gracefulShutdown } from '@/core/db/index.js';
-
 // Termination signals — clean exit
-process.on('SIGTERM', () => gracefulShutdown(0));
-process.on('SIGINT', () => gracefulShutdown(0));
+process.on('SIGTERM', () => db.gracefulShutdown(0));
+process.on('SIGINT', () => db.gracefulShutdown(0));
 
 // Crashes — close connections, then exit with error code
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
-  gracefulShutdown(1);
+  db.gracefulShutdown(1);
 });
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
-  gracefulShutdown(1);
+  db.gracefulShutdown(1);
 });
 ```
 
-`gracefulShutdown()` is idempotent — safe to call from multiple signals.
+`db.gracefulShutdown()` is idempotent — safe to call from multiple signals.
 
 #### Test queries — `scripts/db-query.ts` (MANDATORY pattern)
 
@@ -246,14 +253,14 @@ When a developer asks to "look something up in the database", "check a collectio
 
 ```typescript
 // scripts/queries/find-expired-sessions.ts
-import { queryMany } from '../../src/core/db/index.js';
+import type { StrictDB } from 'strictdb';
 
 export default {
   name: 'find-expired-sessions',
   description: 'Find sessions that expired in the last 24 hours',
-  async run(args: string[]): Promise<void> {
+  async run(db: StrictDB, args: string[]): Promise<void> {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const sessions = await queryMany('sessions',
+    const sessions = await db.queryMany('sessions',
       { expiresAt: { $lt: cutoff } },
       { sort: { expiresAt: -1 }, limit: 50 },
     );
@@ -273,7 +280,7 @@ const queryRegistry = {
 Run: `npx tsx scripts/db-query.ts find-expired-sessions`
 
 **Why this matters:**
-- **One pool** — prevents connection exhaustion (the #1 Claude Code database failure)
+- **One instance** — prevents connection exhaustion (the #1 Claude Code database failure)
 - **One place to change** — swap databases without touching business logic
 - **One place to mock** — testing becomes trivial
 - **One place for test queries** — no scripts scattered across the project
@@ -448,7 +455,7 @@ This gate applies globally — every command or workflow that pushes to Docker H
 
 ## Featured Packages
 
-Three open-source packages by [TheDecipherist](https://github.com/TheDecipherist) (the developer of this starter kit) are integrated into CSS-enabled profiles. All are MIT-licensed.
+Open-source packages by [TheDecipherist](https://github.com/TheDecipherist) (the developer of this starter kit) are integrated into project profiles. All are MIT-licensed.
 
 ### ClassMCP (MCP Server) — Semantic CSS for AI
 
@@ -469,6 +476,16 @@ pnpm add -D classpresso
 ```
 
 npm: [classpresso](https://www.npmjs.com/package/classpresso)
+
+### StrictDB-MCP (MCP Server) — Database Access for AI
+
+Gives AI agents direct database access through 14 MCP tools with full guardrails, sanitization, and error handling. Auto-included in database-enabled profiles (`mcp` field in `claude-mastery-project.conf`).
+
+```bash
+claude mcp add strictdb -- npx -y strictdb-mcp@latest
+```
+
+npm: [strictdb-mcp](https://www.npmjs.com/package/strictdb-mcp)
 
 ### TerseJSON (Optional) — Memory-Efficient JSON
 
@@ -563,8 +580,6 @@ project/
 ├── docs/                  # GitHub Pages site
 │   └── user-guide.html   # Interactive User Guide (HTML)
 ├── src/
-│   ├── core/
-│   │   └── db/            # Centralized database wrapper
 │   ├── handlers/          # Business logic
 │   ├── adapters/          # External service wrappers
 │   └── types/             # Shared TypeScript types
@@ -701,7 +716,7 @@ Every step in a plan MUST have a consistent, unique name. This is how the user r
 ```
 CORRECT — named steps the user can reference:
   Step 1 (Project Setup): Initialize repo with TypeScript
-  Step 2 (Database Layer): Create StrictDB wrapper
+  Step 2 (Database Layer): Set up StrictDB
   Step 3 (Auth System): Implement JWT authentication
   Step 4 (API Routes): Create user endpoints
   Step 5 (Testing): Write E2E tests for auth flow
