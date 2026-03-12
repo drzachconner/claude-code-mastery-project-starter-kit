@@ -815,6 +815,10 @@ Don't just fix bugs — fix the rules that allowed the bug. Every mistake is a m
 
 ---
 
+## Subagent Orchestration
+
+Follow model routing rules in ~/.claude/CLAUDE.md. Default: sonnet for code tasks, haiku for read-only analysis.
+
 ## Workflow Preferences
 
 - Quality over speed — if unsure, ask before executing
