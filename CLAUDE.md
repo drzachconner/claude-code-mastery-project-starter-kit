@@ -828,3 +828,6 @@ Follow model routing rules in ~/.claude/CLAUDE.md. Default: sonnet for code task
 - Use `/context` to check token usage when working on large tasks
 - When testing: queue observations, fix in batch (not one at a time)
 - Research shows 2% misalignment early in a conversation can cause 40% failure rate by end — start fresh when changing direction
+
+## Google Workspace Account
+GWS Profile: `personal`
